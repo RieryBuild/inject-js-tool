@@ -1,0 +1,28 @@
+{
+  "bin": {
+    "inject-js": "inject.cjs"
+  },
+  "dependencies": {
+    "proxy-chain": "^3.0.1",
+    "puppeteer": "^23.11.1"
+  },
+  "description": "Inject JavaScript into websites via stock Chrome (Puppeteer) \u2014 run scripts in-page, capture return values, screenshots and logs.",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "puppeteer",
+    "javascript-injection",
+    "browser-automation",
+    "web-automation"
+  ],
+  "license": "MIT",
+  "main": "inject.cjs",
+  "name": "inject-js-tool",
+  "scripts": {
+    "demo": "node inject.cjs --url https://example.com --file templates/highlight.js --screenshot demo.png",
+    "test": "node inject.cjs --url file:./tests/page.html --file templates/highlight.js --out tests/result.json --wait 1000 --no-proxy",
+    "gui": "node gui/server.cjs --open"
+  },
+  "version": "1.1.0"
+}
