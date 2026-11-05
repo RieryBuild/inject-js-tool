@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inject JS Tool — Gampang</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: 'Segoe UI', system-ui, sans-serif; background:#0f172a; color:#e2e8f0; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 60px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { color:#94a3b8; margin:0 0 24px; }
+  label.judul { display:block; font-weight:600; margin: 18px 0 8px; }
+  input[type=url] { width:100%; padding:14px; font-size:16px; border-radius:10px; border:2px solid #334155; background:#1e293b; color:#fff; }
+  input[type=url]:focus { border-color:#38bdf8; outline:none; }
+  .aksi { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  @media (max-width:560px){ .aksi{grid-template-columns:1fr;} }
+  .kartu { border:2px solid #334155; border-radius:12px; padding:12px 14px; cursor:pointer; background:#1e293b; }
+  .kartu:hover { border-color:#475569; }
+  .kartu.pilih { border-color:#38bdf8; background:#0c2a3f; }
+  .kartu .nama { font-weight:700; font-size:16px; }
+  .kartu .desc { color:#94a3b8; font-size:13px; margin-top:4px; line-height:1.45; }
+  .kartu input { display:none; }
+  textarea { width:100%; min-height:130px; padding:12px; border-radius:10px; border:2px solid #334155; background:#1e293b; color:#fff; font-family: Consolas, monospace; font-size:13px; }
+  .cek { display:flex; gap:18px; flex-wrap:wrap; margin-top:14px; color:#cbd5e1; }
+  .cek label { display:flex; gap:7px; align-items:center; cursor:pointer; font-size:14px; }
+  button#jalan { width:100%; margin-top:22px; padding:16px; font-size:19px; font-weight:800; border:0; border-radius:12px; background:#22c55e; color:#052e12; cursor:pointer; }
+  button#jalan:disabled { background:#475569; color:#cbd5e1; cursor:wait; }
+  #status { margin-top:18px; font-size:15px; min-height:22px; }
+  #hasil { margin-top:10px; display:none; }
+  #hasil .kotak { background:#1e293b; border:2px solid #334155; border-radius:12px; padding:16px; }
+  #hasil h2 { margin:0 0 8px; font-size:19px; }
+  #hasil pre { white-space:pre-wrap; word-break:break-word; background:#0b1220; padding:12px; border-radius:8px; font-size:12.5px; max-height:320px; overflow:auto; }
+  #hasil img { width:100%; border-radius:8px; margin-top:10px; border:1px solid #334155; }
+  .ok { color:#4ade80; } .gagal { color:#f87171; }
+  .kaki { margin-top:28px; color:#64748b; font-size:12.5px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛠️ Inject JS Tool</h1>
+  <p class="sub">Masukkan alamat website, pilih mau ngapain, klik Jalankan. Nggak perlu terminal, nggak perlu ngoding.</p>
+
+  <label class="judul" for="url">1. Alamat website</label>
+  <input type="url" id="url" placeholder="https://contoh-website.com" value="https://example.com">
+
+  <label class="judul">2. Mau ngapain?</label>
+  <div class="aksi" id="aksi"></div>
+
+  <div id="kotakCustom" style="display:none">
+    <label class="judul" for="kode">Tulis script-nya di sini</label>
+    <textarea id="kode" placeholder="Contoh: return document.title"></textarea>
+  </div>
+
+  <div class="cek">
+    <label><input type="checkbox" id="ss" checked> Ambil screenshot hasilnya</label>
+    <label><input type="checkbox" id="lihat"> Tampilkan browser-nya (biar kelihatan prosesnya)</label>
+  </div>
+
+  <button id="jalan">▶ JALANKAN</button>
+  <div id="status"></div>
+
+  <div id="hasil"><div class="kotak">
+    <h2 id="hasilJudul"></h2>
+    <div id="hasilInfo"></div>
+    <pre id="hasilData" style="display:none"></pre>
+    <img id="hasilSs" style="display:none" alt="Screenshot hasil">
+  </div></div>
+
+  <p class="kaki">Aman: halaman ini cuma jalan di komputer kamu sendiri (127.0.0.1). Browser yang dipakai adalah Chrome bawaan tool ini, hasil + screenshot tersimpan di folder <b>outputs</b>.</p>
+</div>
+<script>
+let templates = [];
+let terpilih = 'highlight';
+async function muat() {
+  templates = await (await fetch('/api/templates')).json();
+  const box = document.getElementById('aksi');
+  box.innerHTML = '';
+  for (const t of templates) {
+    const d = document.createElement('div');
+    d.className = 'kartu' + (t.id === terpilih ? ' pilih' : '');
+    d.innerHTML = '<div class="nama">' + t.icon + ' ' + t.name + '</div><div class="desc">' + t.desc + '</div>';
+    d.onclick = () => { terpilih = t.id; document.querySelectorAll('.kartu').forEach(k => k.classList.remove('pilih')); d.classList.add('pilih'); document.getElementById('kotakCustom').style.display = t.id === 'custom' ? 'block' : 'none'; };
+    box.appendChild(d);
+  }
+}
+document.getElementById('jalan').onclick = async () => {
+  const btn = document.getElementById('jalan');
+  const status = document.getElementById('status');
+  const hasil = document.getElementById('hasil');
+  btn.disabled = true; btn.textContent = '⏳ Sedang berjalan... tunggu ya';
+  status.textContent = 'Membuka website dan menjalankan pilihan kamu...';
+  hasil.style.display = 'none';
+  try {
+    const r = await (await fetch('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      url: document.getElementById('url').value,
+      template: terpilih,
+      code: document.getElementById('kode').value,
+      screenshot: document.getElementById('ss').checked,
+      showBrowser: document.getElementById('lihat').checked,
+    })})).json();
+    hasil.style.display = 'block';
+    document.getElementById('hasilJudul').innerHTML = r.ok ? '<span class="ok">✅ Berhasil!</span>' : '<span class="gagal">❌ Gagal</span>';
+    document.getElementById('hasilInfo').textContent = r.ok ? ('Judul halaman: ' + (r.title || '-') + '  •  Alamat akhir: ' + (r.finalUrl || '-')) : (r.error || 'Ada yang salah.');
+    const pre = document.getElementById('hasilData');
+    if (r.value !== null && r.value !== undefined) { pre.style.display = 'block'; pre.textContent = typeof r.value === 'string' ? r.value : JSON.stringify(r.value, null, 2); } else pre.style.display = 'none';
+    const img = document.getElementById('hasilSs');
+    if (r.screenshot) { img.src = r.screenshot + '?t=' + Date.now(); img.style.display = 'block'; } else img.style.display = 'none';
+    status.textContent = '';
+  } catch (e) {
+    status.innerHTML = '<span class="gagal">Gagal menghubungi tool-nya. Coba refresh halaman ini.</span>';
+  }
+  btn.disabled = false; btn.textContent = '▶ JALANKAN';
+};
+muat();
+</script>
+</body>
+</html>
