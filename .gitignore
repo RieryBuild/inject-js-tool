@@ -1,0 +1,8 @@
+node_modules/
+outputs/*
+!outputs/.gitkeep
+tests/*.png
+tests/*.json
+*.png
+*.log
+.DS_Store
