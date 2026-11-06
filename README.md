@@ -32,6 +32,9 @@ node inject.cjs --url https://example.com --file templates/extract.js --out resu
 
 # 4. Persistent inject — script jalan SEBELUM script page sendiri (buat hook/monitor)
 node inject.cjs --url https://example.com --file templates/hook-fetch.js --persistent --wait 6000
+
+# 5. Tunggu elemen dinamis muncul dulu sebelum inject (page SPA / lazy-load)
+node inject.cjs --url https://example.com --file templates/extract.js --wait-for "#app .loaded" --out result.json
 ```
 
 ## Opsi
@@ -43,6 +46,7 @@ node inject.cjs --url https://example.com --file templates/hook-fetch.js --persi
 | `--code "<js>"` | Script inline |
 | `--persistent` | Inject via `evaluateOnNewDocument` — sebelum page load, nempel tiap navigasi |
 | `--wait <ms>` | Tunggu setelah load sebelum ambil hasil (default 3000) |
+| `--wait-for <selector>` | Tunggu selector muncul dulu sebelum inject; gagal kalau tidak muncul dalam `--timeout` (buat page SPA / konten lazy-load) |
 | `--screenshot <png>` | Simpan screenshot setelah inject |
 | `--out <json>` | Simpan hasil (value, title, logs, error) ke JSON |
 | `--headful` | Browser kelihatan (default headless) |
