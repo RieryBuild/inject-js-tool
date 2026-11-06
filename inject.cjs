@@ -8,6 +8,7 @@
  *   node inject.cjs --url https://example.com --code "document.title"
  *   node inject.cjs --url https://example.com --file script.js --persistent
  *   node inject.cjs --url https://example.com --file script.js --screenshot out.png --out result.json
+ *   node inject.cjs --url https://example.com --file script.js --wait-for "#app .loaded"
  *
  * Modes:
  *   default     : page.evaluate() setelah page load — script jalan sekali, return value diambil
@@ -47,20 +48,32 @@ const FILE = arg('file');
 const CODE = arg('code');
 const OUT = arg('out');
 const SCREENSHOT = arg('screenshot');
-const WAIT_MS = parseInt(arg('wait', '3000'), 10);
-const TIMEOUT = parseInt(arg('timeout', '60000'), 10);
+const WAIT_FOR = arg('wait-for');
+function intArg(name, def) {
+  const v = parseInt(arg(name, String(def)), 10);
+  return Number.isFinite(v) && v >= 0 ? v : def;
+}
+const WAIT_MS = intArg('wait', 3000);
+const TIMEOUT = intArg('timeout', 60000);
 const PERSISTENT = has('persistent');
 const HEADFUL = has('headful');
 
 if (!URL_TARGET || (!FILE && !CODE)) {
   console.log(`Usage:
-  node inject.cjs --url <url> --file <script.js> [--persistent] [--screenshot out.png] [--out result.json] [--wait 3000] [--headful]
+  node inject.cjs --url <url> --file <script.js> [--persistent] [--screenshot out.png] [--out result.json] [--wait 3000] [--wait-for <selector>] [--headful]
   node inject.cjs --url <url> --code "<js expression>"`);
   process.exit(2);
 }
 
 const scriptSource = FILE ? fs.readFileSync(path.resolve(FILE), 'utf8') : CODE;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// URL file: relatif (mis. file:./tests/page.html) Chrome tidak resolve terhadap cwd,
+// jadi jadikan absolut dulu — kalau tidak, npm test selalu ERR_FILE_NOT_FOUND.
+let urlTarget = URL_TARGET;
+if (/^file:/i.test(urlTarget) && !/^file:\/\/\//.test(urlTarget)) {
+  urlTarget = 'file://' + path.resolve(urlTarget.replace(/^file:/i, ''));
+}
 
 // Helper yang disuntik duluan ke setiap page
 const HELPER = `
@@ -82,7 +95,7 @@ window.__inject = {
 `;
 
 (async () => {
-  const result = { url: URL_TARGET, mode: PERSISTENT ? 'persistent' : 'once', ok: false, value: null, logs: [], error: null, title: null, finalUrl: null };
+  const result = { url: urlTarget, mode: PERSISTENT ? 'persistent' : 'once', ok: false, value: null, logs: [], error: null, title: null, finalUrl: null };
 
   let localProxy = '';
   const proxyEnv = process.env.https_proxy || process.env.HTTPS_PROXY || '';
@@ -118,7 +131,18 @@ window.__inject = {
       console.log('[inject] persistent mode: script registered via evaluateOnNewDocument');
     }
 
-    await page.goto(URL_TARGET, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+    await page.goto(urlTarget, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+
+    // --wait-for: tunggu elemen dinamis muncul sebelum inject (gagal keras kalau
+    // selector tidak muncul dalam --timeout, biar hasilnya tidak diam-diam basi).
+    if (WAIT_FOR) {
+      try {
+        await page.waitForSelector(WAIT_FOR, { timeout: TIMEOUT });
+        console.log('[inject] wait-for matched:', WAIT_FOR);
+      } catch {
+        throw new Error('wait-for selector not found within timeout: ' + WAIT_FOR);
+      }
+    }
     await sleep(WAIT_MS);
 
     if (!PERSISTENT) {
